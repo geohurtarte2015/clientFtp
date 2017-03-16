@@ -24,20 +24,7 @@ import org.apache.commons.net.ftp.FTPFile;
 import org.apache.commons.net.ftp.FTPReply;
 
 
-public class Ftp {
-            
-private final ResourceBundle rb = ResourceBundle.getBundle("properties.configuration"); 
-private final String path = rb.getString("pathindex");
-private final String serverAddress = rb.getString("gtip");
-private final String userId = rb.getString("gtuser");
-private final String password = rb.getString("gtpassword");
-private final String remoteDirectory = rb.getString("gtsource");
-private final String localDirectory = rb.getString("gtlocal");
-private final String dateBegin = rb.getString("date_begin");
-private final String staticInterval = rb.getString("interval");
-private final String minutesIntervval = rb.getString("minutesinterval");
-private FTPFile[] ftpFiles; 
-private OutputStream output;
+public class Ftp extends functionProperties {
 
 private List listFiles = new ArrayList();
 
@@ -46,9 +33,16 @@ private ArrayList<String> listObject = new ArrayList<String>();
 private FTPClient connFTP;
 private FTPClient ftp;
 private boolean ftpDebug;
+private String minutesInterval;
 
 
-public boolean startFTP() {
+public boolean startFTP() throws IOException {
+    
+        String serverAddress = this.getProperties("gtip");
+        String userId = this.getProperties("gtuser");
+        String password = this.getProperties("gtpassword");
+        String remoteDirectory = this.getProperties("gtsource");
+        minutesInterval = this.getProperties("minutesinterval");
 
         //new ftp client
         ftp = new FTPClient();
@@ -103,8 +97,7 @@ public boolean startFTP() {
         }
 
         //get matchesPattern
-        final String matchesPatternTime = this.getMatches(minutesIntervval.toUpperCase());
-   
+        final String matchesPatternTime = this.getLastMatch();
 
         try {
             ftp.setFileType(FTP.ASCII_FILE_TYPE);
@@ -175,18 +168,21 @@ public void recordDate(String path,String arrayData[]){
 
     }  
     
-public String readDate(){
+public String readDate() throws IOException{
         FormatDate formatDate = new FormatDate();
         String dateRead=null;
         String fileDate=null;
         BufferedReader buffReader=null;
-        ResourceBundle rb = ResourceBundle.getBundle("properties.configuration");
-        String path = rb.getString("pathindex");
+
+        String path = this.getProperties("pathindex");
         try {
         
             buffReader = new BufferedReader (new FileReader(path));            
         
             try {
+                Date today = formatDate.getDateToday();
+                //String[] newDateToday = {formatDate.dateToString(today)};
+                //this.recordDate(path, newDateToday);
                 while ((dateRead = buffReader.readLine()) != null) {
                     fileDate=dateRead;
                     System.out.println("Last reading download " +dateRead);
@@ -208,10 +204,13 @@ public String readDate(){
      
     }
     
-public String getLastDownloadPattern(){
+public String getLastDownloadPattern() throws IOException{
+        String path = this.getProperties("pathindex");
+
         FormatDate formatDate = new FormatDate();
         String pattern=null;
         String fileDate=this.readDate();
+        
          if(fileDate==null){
                 String[] newDateToday = {formatDate.dateToString(formatDate.getDateToday())};
                 this.recordDate(path, newDateToday);
@@ -219,14 +218,17 @@ public String getLastDownloadPattern(){
                 pattern=formatDate.getFormat(formatDate.getDateToday());
                 System.out.println("Pattern match "+pattern );
             }else{
-                pattern=formatDate.getFormat(formatDate.stringToDate(fileDate));
+                DateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+                Date dateNow = formatDate.getDateToday();
+                pattern=formatDate.getFormat(dateNow);
                 System.out.println("Pattern match "+pattern );
             }
         
         return pattern;
     }
     
-public String saveDatePattern(){
+public String saveDatePattern() throws IOException{
+        String path = this.getProperties("pathindex");
         String pattern=null;
         FormatDate formatDate = new FormatDate();
         Date today = formatDate.getDateToday();
@@ -236,7 +238,9 @@ public String saveDatePattern(){
         return pattern;
     }
     
-public String getMatches(String minutes){
+public String getMatches(String minutes) throws IOException{
+        String staticInterval = this.getProperties("activate_date_begin");
+        String dateBegin = this.getProperties("date_begin");
         
         String patternUltimateDate = null;
         FormatDate formatDate = new FormatDate();
@@ -247,6 +251,7 @@ public String getMatches(String minutes){
         Date tempDate;
 
         if (staticInterval.equals("T")) {
+            min= Integer.parseInt(minutesInterval);
             Date date = formatDate.stringToDate(dateBegin);
             cal.setTime(date);
 
@@ -256,7 +261,9 @@ public String getMatches(String minutes){
 
             //read ultimate date download         
             patternUltimateDate = this.getLastDownloadPattern();
-
+         
+            
+            
             //save date and time present into file and return format present string date
             this.saveDatePattern();
 
@@ -288,13 +295,34 @@ public String getMatches(String minutes){
             newMatch = newMatch + ";" +  patternUltimateDate;
         }
 
-        System.out.println(newMatch);
+        //System.out.println(newMatch);
         return newMatch;
 
     }
 
-public boolean getFiles() {
+//get ultimate time-date matches  
+public String getLastMatch() throws IOException{
+
+    String lastMatches="";
     
+    FormatDate formatDate = new FormatDate();
+    String dateUltimate = this.readDate();
+          Date date = formatDate.getDateToday();
+          String dateToday = formatDate.dateToString(date);
+          //int differenceMinutes = formatDate.differenceTime(dateUltimate, dateToday);
+          int differenceMinutes = Integer.parseInt(minutesInterval);
+          lastMatches = this.getMatches(String.valueOf(differenceMinutes));
+          System.out.println(lastMatches);
+    
+    
+
+    
+    return lastMatches;
+}
+
+public boolean getFiles() throws IOException {
+       String localDirectory = this.getProperties("gtlocal");
+       
 	File localFile;
         FileOutputStream outFile;
         int index;
@@ -305,6 +333,7 @@ public boolean getFiles() {
             System.out.println("[inf]Getting files");
         }
         try {
+          
             if (ftpDebug) {
                 System.out.println("[inf]" + listObject.size() + " Posible files");
             }
@@ -315,7 +344,7 @@ public boolean getFiles() {
                     System.out.print("[inf]file (" + index + " of " + listObject.size() + ") :" + listObject.get(index));
                 }
 
-                localFile = new File(this.localDirectory + listObject.get(index));
+                localFile = new File(localDirectory + listObject.get(index));
                 outFile = new FileOutputStream(localFile);
                 resultGettingFile = ftp.retrieveFile(listObject.get(index), outFile);
 

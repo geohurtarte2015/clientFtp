@@ -17,15 +17,8 @@ import java.util.logging.Logger;
 
 
 public class FormatDate {
-    
-     private final ResourceBundle rb = ResourceBundle.getBundle("properties.configuration"); 
-     private final String dateBegin = rb.getString("date_begin");
-     private final String minutesinterval = rb.getString("minutesinterval");
-     private final String staticInterval = rb.getString("interval");
 
-
-    public static void main(String[] args) {
-       
+    public static void main(String[] args) {       
 
         FormatDate formatDate = new FormatDate();
 
